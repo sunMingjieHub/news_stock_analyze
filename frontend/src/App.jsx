@@ -7,10 +7,10 @@ import {
   BarChartOutlined,
   SettingOutlined
 } from '@ant-design/icons'
-import Dashboard from './pages/Dashboard'
-import NewsAnalysis from './pages/NewsAnalysis'
-import SentimentTrend from './pages/SentimentTrend'
-import Settings from './pages/Settings'
+import Dashboard from './pages/Dashboard.jsx'
+import NewsAnalysis from './pages/NewsAnalysis.jsx'
+import SentimentTrend from './pages/SentimentTrend.jsx'
+import Settings from './pages/Settings.jsx'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
