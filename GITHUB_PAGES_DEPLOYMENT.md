@@ -2,78 +2,65 @@
 
 ## 问题修复说明
 
-### 缓存错误修复
-**问题**：GitHub Actions 报错 "Some specified paths were not resolved, unable to cache dependencies."
+### 缓存错误解决方案
+GitHub Actions 报错 "Some specified paths were not resolved, unable to cache dependencies" 的原因是：
 
-**原因**：frontend目录下没有package-lock.json文件，但工作流中配置了缓存该文件路径
-
-**解决方案**：
-- 将缓存依赖路径从 `frontend/package-lock.json` 改为 `frontend/package.json`
-- 将依赖安装命令从 `npm ci` 改为 `npm install`
-
-## 部署前准备
-
-### 1. 环境配置
-确保您的GitHub仓库已启用GitHub Pages功能：
-- 进入仓库 Settings → Pages
-- Source 选择 "GitHub Actions"
-
-### 2. 环境变量设置
-在GitHub仓库中设置以下环境变量：
-- `VITE_API_BASE_URL`: 您的Vercel后端API地址（如：https://stock-analysis-system-f478i1336-smjs-projects-bfe2d356.vercel.app）
+1. **问题根源**：frontend目录下没有 `package-lock.json` 文件
+2. **解决方案**：移除了 GitHub Actions 工作流中的缓存配置
+3. **影响**：对于小型项目，缓存带来的性能提升有限，移除缓存不会影响部署功能
 
 ## 部署流程
 
-### 自动部署（推荐）
-1. 将代码推送到 `main` 分支
-2. GitHub Actions会自动触发部署流程
-3. 查看 Actions 标签页监控部署状态
+### 1. 准备工作
+- 确保项目已推送到 GitHub 仓库
+- 在 GitHub 仓库设置中启用 Pages 功能
+- 选择 "GitHub Actions" 作为部署源
 
-### 手动部署
-1. 进入 GitHub Actions 页面
-2. 选择 "Deploy to GitHub Pages" 工作流
-3. 点击 "Run workflow" 手动触发部署
+### 2. 自动部署
+当代码推送到 `main` 分支时，GitHub Actions 会自动执行以下步骤：
 
-## 工作流说明
+1. **Checkout** - 检出代码
+2. **Setup Node.js** - 设置 Node.js 环境（v18）
+3. **Install dependencies** - 安装前端依赖
+4. **Build frontend** - 构建生产版本
+5. **Setup Pages** - 配置 Pages 环境
+6. **Upload artifact** - 上传构建产物
+7. **Deploy to GitHub Pages** - 部署到 GitHub Pages
 
-### 构建阶段 (build job)
-1. **检出代码**：使用 actions/checkout@v4
-2. **设置Node.js环境**：使用 actions/setup-node@v4，配置Node.js 18和npm缓存
-3. **安装依赖**：在frontend目录执行 `npm install`
-4. **构建前端**：执行 `npm run build` 生成生产版本
-5. **配置Pages**：使用 actions/configure-pages@v4
-6. **上传制品**：将dist目录上传为部署制品
+### 3. 手动触发
+也可以在 GitHub Actions 页面手动触发部署：
+- 进入仓库的 Actions 页面
+- 选择 "Deploy to GitHub Pages" 工作流
+- 点击 "Run workflow"
 
-### 部署阶段 (deploy job)
-1. **部署到GitHub Pages**：使用 actions/deploy-pages@v4
-2. **环境配置**：使用github-pages环境
+## 环境配置
+
+### 前端环境变量
+生产环境配置在 `frontend/.env.production`：
+```
+VITE_API_BASE_URL=https://stock-analysis-system-f478i1336-smjs-projects-bfe2d356.vercel.app
+```
+
+### Vite 配置
+`vite.config.js` 已配置 base 路径为 `/stock/`，确保在 GitHub Pages 子路径下正常工作。
+
+## 访问地址
+部署成功后，网站将通过以下地址访问：
+```
+https://[username].github.io/stock/
+```
 
 ## 故障排除
 
 ### 常见问题
+1. **缓存错误**：已通过移除缓存配置解决
+2. **路径问题**：确保 vite.config.js 中的 base 路径正确
+3. **依赖安装失败**：检查 package.json 依赖版本兼容性
 
-#### 1. 构建失败
-- 检查Node.js版本兼容性
-- 确认package.json中的依赖版本正确
-- 查看构建日志中的具体错误信息
-
-#### 2. 缓存错误
-- 确保frontend目录下有package.json文件
-- 如果项目没有package-lock.json，使用package.json作为缓存依赖路径
-
-#### 3. API连接失败
-- 确认VITE_API_BASE_URL环境变量设置正确
-- 检查Vercel后端服务是否正常运行
-
-#### 4. 部署后页面空白
-- 检查dist目录是否成功生成
-- 确认静态资源路径配置正确
-
-## 部署后验证
-
-1. 访问GitHub Pages提供的URL
-2. 测试前端与后端API的连接
-3. 验证所有功能正常
+### 验证步骤
+1. 检查 GitHub Actions 运行日志
+2. 确认构建产物包含 dist 目录
+3. 访问部署地址验证功能正常
 
 ## 相关文件
 - 工作流配置：`.github/workflows/deploy-to-gh-pages.yml`
