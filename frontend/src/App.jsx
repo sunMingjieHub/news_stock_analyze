@@ -7,10 +7,10 @@ import {
   BarChartOutlined,
   SettingOutlined
 } from '@ant-design/icons'
-import Dashboard from './pages/Dashboard.jsx'
-import NewsAnalysis from './pages/NewsAnalysis.jsx'
-import SentimentTrend from './pages/SentimentTrend.jsx'
-import Settings from './pages/Settings.jsx'
+import Dashboard from '@/pages/Dashboard.jsx'
+import NewsAnalysis from '@/pages/NewsAnalysis.jsx'
+import SentimentTrend from '@/pages/SentimentTrend.jsx'
+import Settings from '@/pages/Settings.jsx'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
@@ -33,7 +33,7 @@ function App() {
       key: '3',
       icon: <BarChartOutlined />,
       label: '情绪趋势',
-      path: '/trend'
+      path: '/sentiment'
     },
     {
       key: '4',
@@ -43,41 +43,31 @@ function App() {
     }
   ]
 
+  const [collapsed, setCollapsed] = React.useState(false)
+
   return (
-    <Layout className="app-layout">
-      <Sider
-        theme="light"
-        breakpoint="lg"
-        collapsedWidth="0"
-        width={200}
-      >
-        <div className="logo">
-          <h2>📈 股票分析</h2>
-        </div>
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
+        <div style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.3)' }} />
         <Menu
-          mode="inline"
+          theme="dark"
           defaultSelectedKeys={['1']}
+          mode="inline"
           items={menuItems.map(item => ({
             ...item,
             onClick: () => window.location.href = item.path
           }))}
         />
       </Sider>
-      
       <Layout>
-        <Header className="app-header">
-          <h1>股票新闻智能分析系统</h1>
-        </Header>
-        
-        <Content className="app-content">
-          <div className="container">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/news" element={<NewsAnalysis />} />
-              <Route path="/trend" element={<SentimentTrend />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </div>
+        <Header style={{ padding: 0, background: '#fff' }} />
+        <Content style={{ margin: '0 16px' }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/news" element={<NewsAnalysis />} />
+            <Route path="/sentiment" element={<SentimentTrend />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
         </Content>
       </Layout>
     </Layout>
