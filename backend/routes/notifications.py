@@ -260,9 +260,11 @@ def get_notifications_status():
         'status': 'active',
         'endpoints': {
             'send': '/send - POST - 发送通知',
+            'alert': '/alert - POST - 发送重要通知',
             'preferences': '/preferences - GET/PUT - 用户偏好管理',
             'history': '/history - GET - 通知历史',
-            'test': '/test - POST - 测试渠道连通性'
+            'test': '/test - POST - 测试渠道连通性',
+            'test-connectivity': '/test-connectivity - GET - 测试所有渠道连通性'
         },
         'supported_channels': ['telegram', 'wechat_work', 'email'],
         'features': [
@@ -270,45 +272,183 @@ def get_notifications_status():
             '用户偏好设置',
             '优先级管理',
             '历史记录追踪',
-            '连通性测试'
+            '连通性测试',
+            '重要通知警报',
+            'GitHub Actions集成'
         ],
         'timestamp': datetime.now().isoformat()
     })
 
-# 发送通知
-@notifications_bp.route('/send', methods=['POST'])
-async def send_notification():
+# 重要通知接口 - 支持GitHub Actions定时任务调用
+@notifications_bp.route('/alert', methods=['POST'])
+async def send_alert_notification():
+    """
+    重要通知接口，用于发送高优先级警报
+    请求体格式:
+    {
+        "title": "重要市场分析报告",
+        "message": "发现重要市场信号，请及时查看详细分析",
+        "analysis_result": {...},
+        "urgency": "high"
+    }
+    """
     try:
         data = request.get_json()
         if not data:
             return jsonify_chinese({'error': '请提供JSON格式的请求体'}), 400
         
-        user_id = data.get('user_id')
-        message = data.get('message')
-        priority = data.get('priority', 'medium')
-        channels = data.get('channels')
+        title = data.get('title', '重要通知')
+        message = data.get('message', '')
+        analysis_result = data.get('analysis_result', {})
+        urgency = data.get('urgency', 'high')
         
-        if not user_id:
-            return jsonify_chinese({'error': '请提供用户ID'}), 400
         if not message:
             return jsonify_chinese({'error': '请提供通知内容'}), 400
         
-        # 验证优先级
-        valid_priorities = ['low', 'medium', 'high', 'urgent']
-        if priority not in valid_priorities:
-            return jsonify_chinese({'error': f'优先级必须是: {", ".join(valid_priorities)}'}), 400
+        # 构建完整的通知消息
+        full_message = f"🚨 {title}\\n\\n{message}"
+        
+        if analysis_result:
+            # 添加分析结果摘要
+            sentiment = analysis_result.get('sentiment', '未知')
+            sentiment_strength = analysis_result.get('sentimentStrength', 0)
+            risk_level = analysis_result.get('riskLevel', '未知')
+            
+            full_message += f"\\n\\n📊 分析摘要:\\n"
+            full_message += f"情绪: {sentiment} (强度: {sentiment_strength}/10)\\n"
+            full_message += f"风险等级: {risk_level}"
+        
+        # 根据紧急程度设置优先级
+        priority_map = {
+            'low': 'medium',
+            'medium': 'high', 
+            'high': 'urgent'
+        }
+        priority = priority_map.get(urgency, 'urgent')
+        
+        # 发送给默认用户（可以配置为系统管理员或特定用户）
+        user_id = 'system_admin'
         
         # 发送通知
-        result = await notification_manager.send_notification(user_id, message, priority, channels)
+        result = await notification_manager.send_notification(
+            user_id, full_message, priority
+        )
         
         if result['success']:
-            return jsonify_chinese(result)
+            return jsonify_chinese({
+                'success': True,
+                'data': result['data'],
+                'message': '重要通知发送成功'
+            })
         else:
-            return jsonify_chinese(result), 500
+            return jsonify_chinese({
+                'success': False,
+                'error': '重要通知发送失败',
+                'details': result.get('error', '未知错误')
+            }), 500
+            
+    except Exception as e:
+        logger.error(f'发送重要通知错误: {str(e)}')
+        return jsonify_chinese({
+            'error': '发送重要通知失败', 
+            'message': str(e)
+        }), 500
+
+# 常规通知接口 - 适配GitHub Actions定时任务调用
+@notifications_bp.route('/send', methods=['POST'])
+async def send_general_notification():
+    """
+    常规通知接口，支持多种参数格式
+    支持news-crawler.yml中的参数格式:
+    {
+        "message": "通知内容",
+        "channels": ["telegram", "wechat_work", "email"],
+        "priority": "normal"
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify_chinese({'error': '请提供JSON格式的请求体'}), 400
+        
+        # 支持多种参数格式
+        message = data.get('message', '')
+        channels = data.get('channels', [])
+        priority = data.get('priority', 'medium')
+        
+        if not message:
+            return jsonify_chinese({'error': '请提供通知内容'}), 400
+        
+        # 默认用户ID
+        user_id = 'system_user'
+        
+        # 发送通知
+        result = await notification_manager.send_notification(
+            user_id, message, priority, channels
+        )
+        
+        if result['success']:
+            return jsonify_chinese({
+                'success': True,
+                'data': result['data'],
+                'message': '通知发送成功'
+            })
+        else:
+            return jsonify_chinese({
+                'success': False,
+                'error': '通知发送失败',
+                'details': result.get('error', '未知错误')
+            }), 500
             
     except Exception as e:
         logger.error(f'发送通知错误: {str(e)}')
-        return jsonify_chinese({'error': '发送通知失败', 'message': str(e)}), 500
+        return jsonify_chinese({
+            'error': '发送通知失败', 
+            'message': str(e)
+        }), 500
+
+# 通知渠道连通性测试接口 - 支持GitHub Actions定时任务调用
+@notifications_bp.route('/test-connectivity', methods=['GET'])
+def test_all_channels_connectivity():
+    """
+    测试所有通知渠道的连通性
+    返回格式:
+    {
+        "success": true,
+        "data": {
+            "telegram": {...},
+            "wechat_work": {...},
+            "email": {...}
+        }
+    }
+    """
+    try:
+        channels_status = {}
+        all_success = True
+        
+        for channel_name in ['telegram', 'wechat_work', 'email']:
+            result = notification_manager.test_channel_connectivity(channel_name)
+            channels_status[channel_name] = result
+            if not result.get('success'):
+                all_success = False
+        
+        return jsonify_chinese({
+            'success': all_success,
+            'data': channels_status,
+            'message': f'连通性测试完成，{"所有渠道正常" if all_success else "部分渠道异常"}',
+            'summary': {
+                'total_channels': len(channels_status),
+                'successful_channels': len([c for c in channels_status.values() if c.get('success')]),
+                'failed_channels': len([c for c in channels_status.values() if not c.get('success')])
+            }
+        })
+            
+    except Exception as e:
+        logger.error(f'测试渠道连通性错误: {str(e)}')
+        return jsonify_chinese({
+            'error': '测试渠道连通性失败', 
+            'message': str(e)
+        }), 500
 
 # 获取用户偏好
 @notifications_bp.route('/preferences/<user_id>', methods=['GET'])
