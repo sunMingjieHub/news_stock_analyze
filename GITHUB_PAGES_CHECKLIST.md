@@ -1,87 +1,69 @@
 # GitHub Pages 部署检查清单
 
-## 部署前检查
+## ✅ 前置检查
+- [x] 项目包含frontend目录（前端代码）
+- [x] frontend目录包含package.json文件
+- [x] package.json包含正确的构建脚本（build）
+- [x] frontend目录包含vite.config.js配置文件
+- [x] vite.config.js配置了正确的base路径（/stock/）
 
-### ✅ 项目结构验证
-- [x] 确认 frontend 目录存在且包含必要文件
-- [x] 确认 package.json 文件存在且依赖配置正确
-- [x] 确认 vite.config.js 配置了正确的 base 路径 `/stock/`
-- [x] 确认 .env.production 文件配置了正确的 API 地址
+## ✅ GitHub Actions工作流配置
+- [x] 创建了`.github/workflows/deploy-to-gh-pages.yml`文件
+- [x] 工作流在push到main分支时自动触发
+- [x] 工作流包含正确的Node.js版本设置（v18）
+- [x] 工作流正确设置了frontend目录的依赖安装和构建
+- [x] 移除了可能导致错误的缓存配置
+- [x] 工作流正确配置了GitHub Pages部署
 
-### ✅ GitHub Actions 工作流验证
-- [x] 确认 .github/workflows/deploy-to-gh-pages.yml 文件存在
-- [x] 确认工作流配置正确（已移除缓存配置）
-- [x] 确认触发条件设置为 push 到 main 分支
-- [x] 确认权限配置正确
+## ✅ 环境配置
+- [x] 创建了`frontend/.env.production`文件
+- [x] 配置了正确的Vercel API地址
+- [x] 更新了vite.config.js支持环境变量
+- [x] 在GitHub仓库Secrets中配置了`VERCEL_API_URL`
 
-### ✅ 缓存配置验证
-- [x] 确认 GitHub Actions 中已移除缓存配置（解决路径解析错误）
-- [x] 确认没有 package-lock.json 文件不会影响部署
-- [x] 确认依赖安装步骤配置正确
+## ✅ news-crawler工作流优化
+- [x] 移除了本地后端服务启动步骤
+- [x] 修改为直接调用Vercel API
+- [x] 更新了所有API调用使用`VERCEL_API_URL`
+- [x] 移除了不必要的Node.js缓存配置
+- [x] 简化了工作流步骤，避免资源冲突
 
-## 缓存配置检查
-- [x] **检查缓存配置冲突**：确认没有其他工作流文件中的缓存配置干扰前端部署
-- [x] **修复缓存路径错误**：移除news-crawler.yml中指向backend/package-lock.json的错误缓存配置
-- [x] **验证Python项目缓存**：确认backend是Python项目，不需要npm缓存配置
+## ✅ 项目结构验证
+- [x] frontend目录：纯前端项目，使用npm管理依赖
+- [x] backend目录：Python后端项目，已独立部署到Vercel
+- [x] 两个工作流职责清晰分离：
+  - deploy-to-gh-pages.yml：仅前端部署
+  - news-crawler.yml：定时任务，调用Vercel API
 
-## 部署过程检查
+## 🔧 部署后验证
+- [ ] 推送代码到main分支，观察GitHub Actions运行状态
+- [ ] 确认前端成功部署到GitHub Pages
+- [ ] 访问`https://[username].github.io/stock/`验证应用可访问
+- [ ] 测试news-crawler工作流手动触发功能
+- [ ] 验证Vercel API调用正常（检查工作流日志）
 
-### ✅ 代码推送
-- [ ] 确保所有修改已提交到本地仓库
-- [ ] 推送代码到 GitHub 的 main 分支
-- [ ] 确认推送成功
+## 📝 问题记录与解决方案
 
-### ✅ GitHub Actions 运行监控
-- [ ] 进入 GitHub 仓库的 Actions 页面
-- [ ] 确认 "Deploy to GitHub Pages" 工作流已触发
-- [ ] 监控工作流执行状态，确保所有步骤通过
+### 已解决的问题
+1. **缓存路径错误**：移除了GitHub Actions中的缓存配置，避免package-lock.json不存在导致的错误
+2. **后端服务冲突**：news-crawler工作流现在直接调用Vercel API，避免在GitHub Actions中启动本地后端服务
+3. **构建配置优化**：使用npm install替代npm ci，适应没有package-lock.json的情况
 
-### ✅ 工作流步骤验证
-- [ ] **Checkout**: 代码检出成功
-- [ ] **Setup Node.js**: Node.js 环境设置成功（无缓存错误）
-- [ ] **Install dependencies**: 依赖安装成功
-- [ ] **Build frontend**: 前端构建成功
-- [ ] **Setup Pages**: Pages 环境配置成功
-- [ ] **Upload artifact**: 构建产物上传成功
-- [ ] **Deploy to GitHub Pages**: 部署成功
+### 当前配置说明
+- **前端部署**：通过deploy-to-gh-pages.yml工作流独立处理
+- **后端服务**：已部署在Vercel，GitHub Actions中不包含后端部署
+- **定时任务**：news-crawler.yml通过API调用与Vercel后端交互
+- **环境分离**：前端和后端完全分离，避免资源冲突
 
-## 部署后验证
+## 📋 维护指南
+1. **前端更新**：修改frontend目录代码后推送到main分支
+2. **后端更新**：直接推送到Vercel连接的仓库分支
+3. **定时任务调整**：修改news-crawler.yml中的cron表达式
+4. **API变更**：更新GitHub Secrets中的VERCEL_API_URL
 
-### ✅ GitHub Pages 设置
-- [ ] 进入仓库 Settings → Pages
-- [ ] 确认部署源为 "GitHub Actions"
-- [ ] 确认部署状态为 "Success"
-
-### ✅ 网站功能验证
-- [ ] 访问部署地址：https://[username].github.io/stock/
-- [ ] 确认页面正常加载
-- [ ] 测试主要功能（股票查询、图表显示等）
-- [ ] 确认 API 调用正常
-
-## 故障排除指南
-
-### 🔧 缓存错误解决方案
-**问题**: "Some specified paths were not resolved, unable to cache dependencies"
-**原因**: frontend 目录下没有 package-lock.json 文件
-**解决方案**: 已移除 GitHub Actions 中的缓存配置
-
-### 🔧 构建失败
-- 检查依赖版本兼容性
-- 确认 Node.js 版本兼容性
-- 查看构建日志中的具体错误信息
-
-### 🔧 部署失败
-- 确认 GitHub Pages 功能已启用
-- 检查仓库权限设置
-- 验证环境变量配置
-
-### 🔧 页面无法访问
-- 确认 base 路径配置正确
-- 检查网络连接
-- 验证域名解析
-
-## 重要提醒
-1. **缓存配置**: 已移除缓存配置以避免路径解析错误
-2. **路径配置**: 确保所有路径引用都基于 `/stock/` 前缀
-3. **环境变量**: 生产环境使用 .env.production 中的配置
-4. **手动部署**: 可通过 GitHub Actions 页面手动触发部署
+## 🚨 故障排除
+如果部署失败，请检查：
+1. GitHub Actions运行日志中的具体错误信息
+2. Vercel API端点是否可访问
+3. GitHub Secrets配置是否正确
+4. 前端构建产物是否生成成功

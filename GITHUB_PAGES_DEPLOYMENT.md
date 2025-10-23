@@ -1,71 +1,66 @@
-# GitHub Pages 部署指南
+# GitHub Pages 前端部署指南
 
-## 问题修复说明
-
-### 缓存错误解决方案
-GitHub Actions 报错 "Some specified paths were not resolved, unable to cache dependencies" 的原因是：
-
-1. **问题根源**：frontend目录下没有 `package-lock.json` 文件
-2. **解决方案**：移除了 GitHub Actions 工作流中的缓存配置
-3. **影响**：对于小型项目，缓存带来的性能提升有限，移除缓存不会影响部署功能
+## 概述
+本项目使用GitHub Pages部署前端应用，后端服务已独立部署在Vercel上。
 
 ## 部署流程
 
-### 1. 准备工作
-- 确保项目已推送到 GitHub 仓库
-- 在 GitHub 仓库设置中启用 Pages 功能
-- 选择 "GitHub Actions" 作为部署源
+### 1. 自动部署
+- 当代码推送到 `main` 分支时，GitHub Actions会自动触发部署流程
+- 工作流文件：`.github/workflows/deploy-to-gh-pages.yml`
 
-### 2. 自动部署
-当代码推送到 `main` 分支时，GitHub Actions 会自动执行以下步骤：
+### 2. 手动部署
+- 在GitHub仓库的Actions标签页中，选择"Deploy to GitHub Pages"工作流
+- 点击"Run workflow"手动触发部署
 
-1. **Checkout** - 检出代码
-2. **Setup Node.js** - 设置 Node.js 环境（v18）
-3. **Install dependencies** - 安装前端依赖
-4. **Build frontend** - 构建生产版本
-5. **Setup Pages** - 配置 Pages 环境
-6. **Upload artifact** - 上传构建产物
-7. **Deploy to GitHub Pages** - 部署到 GitHub Pages
+## 工作流说明
 
-### 3. 手动触发
-也可以在 GitHub Actions 页面手动触发部署：
-- 进入仓库的 Actions 页面
-- 选择 "Deploy to GitHub Pages" 工作流
-- 点击 "Run workflow"
+### 前端部署工作流 (deploy-to-gh-pages.yml)
+- **目的**: 仅部署前端代码到GitHub Pages
+- **触发条件**: push到main分支或手动触发
+- **构建步骤**:
+  1. 检出代码
+  2. 设置Node.js环境 (v18)
+  3. 安装前端依赖 (frontend目录)
+  4. 构建生产版本
+  5. 上传构建产物到GitHub Pages
+
+### 新闻爬取工作流 (news-crawler.yml) - 已优化
+- **目的**: 定时自动爬取和分析股票新闻
+- **触发条件**: 每小时自动运行 (北京时间9:00-18:00) 或手动触发
+- **重要变更**: 现在直接调用Vercel部署的后端API，不在GitHub Actions中启动本地后端服务
+- **API端点**: 使用 `VERCEL_API_URL` 环境变量指向已部署的后端服务
 
 ## 环境配置
 
-### 前端环境变量
-生产环境配置在 `frontend/.env.production`：
-```
+### 前端环境变量 (frontend/.env.production)
+```env
 VITE_API_BASE_URL=https://stock-analysis-system-f478i1336-smjs-projects-bfe2d356.vercel.app
 ```
 
-### Vite 配置
-`vite.config.js` 已配置 base 路径为 `/stock/`，确保在 GitHub Pages 子路径下正常工作。
+### GitHub Secrets配置
+需要在GitHub仓库的Settings → Secrets and variables → Actions中配置：
+- `VERCEL_API_URL`: Vercel部署的后端服务URL
 
 ## 访问地址
-部署成功后，网站将通过以下地址访问：
-```
-https://[username].github.io/stock/
-```
+- GitHub Pages: `https://[username].github.io/stock/`
+- Vercel后端: `https://stock-analysis-system-f478i1336-smjs-projects-bfe2d356.vercel.app`
 
 ## 故障排除
 
 ### 常见问题
-1. **缓存错误**：已通过移除缓存配置解决
-2. **路径问题**：确保 vite.config.js 中的 base 路径正确
-3. **依赖安装失败**：检查 package.json 依赖版本兼容性
+1. **缓存路径错误**: 已移除缓存配置，避免package-lock.json不存在导致的错误
+2. **后端服务冲突**: news-crawler工作流现在直接调用Vercel API，避免本地服务冲突
+3. **构建失败**: 检查Node.js版本兼容性和依赖安装
 
-### 验证步骤
-1. 检查 GitHub Actions 运行日志
-2. 确认构建产物包含 dist 目录
-3. 访问部署地址验证功能正常
+### 调试步骤
+1. 检查GitHub Actions运行日志
+2. 验证环境变量配置
+3. 确认API端点可访问性
+4. 检查构建产物是否正确生成
 
-## 相关文件
-- 工作流配置：`.github/workflows/deploy-to-gh-pages.yml`
-- 生产环境配置：`frontend/.env.production`
-- Vite配置：`frontend/vite.config.js`
-
-## 技术支持
-如遇问题，请查看GitHub Actions的详细日志，或参考GitHub官方文档。
+## 注意事项
+- 前端部署只处理frontend目录内容
+- 后端服务已独立部署在Vercel，GitHub Actions中不包含后端部署
+- news-crawler工作流通过API调用与Vercel后端交互
+- 确保Vercel API URL在GitHub Secrets中正确配置
