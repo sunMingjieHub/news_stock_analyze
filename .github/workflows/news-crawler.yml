@@ -1,0 +1,178 @@
+name: 股票新闻自动爬取与分析
+
+on:
+  schedule:
+    # 每小时运行一次（北京时间 9:00, 10:00, ..., 18:00）
+    - cron: '0 1-10 * * 1-5'  # UTC时间 1:00-10:00，对应北京时间 9:00-18:00
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      sources:
+        description: '新闻源（逗号分隔）'
+        required: false
+        default: '新浪财经,东方财富,雪球'
+      notify_channels:
+        description: '通知渠道（telegram,wechat,email,all）'
+        required: false
+        default: 'all'
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  crawl-and-analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 设置Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: 安装后端依赖
+      run: |
+        cd backend
+        npm ci
+
+    - name: 配置环境变量
+      run: |
+        echo "PORT=3001" >> .env
+        echo "NOTION_API_KEY=${{ secrets.NOTION_API_KEY }}" >> .env
+        echo "NOTION_DATABASE_ID=${{ secrets.NOTION_DATABASE_ID }}" >> .env
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+        echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+        echo "WECHAT_WEBHOOK_URL=${{ secrets.WECHAT_WEBHOOK_URL }}" >> .env
+        echo "WECHAT_BOT_KEY=${{ secrets.WECHAT_BOT_KEY }}" >> .env
+        echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> .env
+        echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> .env
+        echo "EMAIL_SECURE=${{ secrets.EMAIL_SECURE }}" >> .env
+        echo "EMAIL_USER=${{ secrets.EMAIL_USER }}" >> .env
+        echo "EMAIL_PASS=${{ secrets.EMAIL_PASS }}" >> .env
+        echo "VERCEL_API_URL=${{ secrets.VERCEL_API_URL }}" >> .env
+        echo "NODE_ENV=production" >> .env
+
+    - name: 启动后端服务
+      run: |
+        cd backend
+        npm start &
+        sleep 10  # 等待服务启动
+
+    - name: 执行新闻爬取
+      run: |
+        cd backend
+        # 使用curl调用爬取API
+        RESPONSE=$(curl -s -X POST "http://localhost:3001/api/news/crawl" \
+          -H "Content-Type: application/json" \
+          -d "{\"sources\": [${{ github.event.inputs.sources || '[\"新浪财经\",\"东方财富\",\"雪球\"]' }}]}")
+        
+        echo "爬取结果: $RESPONSE"
+        echo "CRAWL_RESULT=$RESPONSE" >> $GITHUB_ENV
+
+    - name: 分析新闻内容
+      run: |
+        cd backend
+        # 解析爬取结果并进行分析
+        CRAWL_DATA=$(echo '${{ env.CRAWL_RESULT }}' | jq -r '.results[] | select(.success == true) | .items[] | {title: .title, url: .url, content: "待提取", sourceCredibility: .credibility}' | jq -s '.')
+        
+        if [ "$(echo $CRAWL_DATA | jq length)" -gt 0 ]; then
+          ANALYSIS_RESPONSE=$(curl -s -X POST "http://localhost:3001/api/analysis/batch-analyze" \
+            -H "Content-Type: application/json" \
+            -d "{\"articles\": $CRAWL_DATA}")
+          
+          echo "分析结果: $ANALYSIS_RESPONSE"
+          echo "ANALYSIS_RESULT=$ANALYSIS_RESPONSE" >> $GITHUB_ENV
+        else
+          echo "没有可分析的新闻内容"
+          echo "ANALYSIS_RESULT={\"success\":false,\"message\":\"无新闻内容\"}" >> $GITHUB_ENV
+        fi
+
+    - name: 发送通知
+      run: |
+        cd backend
+        NOTIFY_CHANNELS="${{ github.event.inputs.notify_channels || 'all' }}"
+        
+        # 根据分析结果决定是否发送通知
+        ANALYSIS_DATA=$(echo '${{ env.ANALYSIS_RESULT }}' | jq -r '.data')
+        
+        if [ "$ANALYSIS_DATA" != "null" ] && [ "$(echo $ANALYSIS_DATA | jq '.articles | length')" -gt 0 ]; then
+          # 提取重要分析结果（情绪强度高或风险等级高）
+          IMPORTANT_ANALYSIS=$(echo $ANALYSIS_DATA | jq -r '.articles[] | select(.success == true and (.analysis.sentimentStrength >= 7 or .analysis.riskLevel == "高风险")) | .analysis')
+          
+          if [ "$(echo $IMPORTANT_ANALYSIS | jq -s length)" -gt 0 ]; then
+            # 发送重要分析通知
+            curl -s -X POST "http://localhost:3001/api/notifications/alert" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"title\": \"重要市场分析报告\",
+                \"message\": \"发现重要市场信号，请及时查看详细分析\",
+                \"analysis_result\": $(echo $IMPORTANT_ANALYSIS | jq -s '. | first'),
+                \"urgency\": \"high\"
+              }"
+          else
+            # 发送常规分析总结
+            MARKET_ANALYSIS=$(echo $ANALYSIS_DATA | jq -r '.marketAnalysis')
+            curl -s -X POST "http://localhost:3001/api/notifications/send" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"message\": \"📊 今日市场情绪分析完成\\n\\n总体情绪: $(echo $MARKET_ANALYSIS | jq -r '.overallSentiment')\\n置信度: $(echo $MARKET_ANALYSIS | jq -r '.confidence * 100 | round')%\\n建议: $(echo $MARKET_ANALYSIS | jq -r '.recommendation')\",
+                \"channels\": [\"$NOTIFY_CHANNELS\"],
+                \"priority\": \"normal\"
+              }"
+          fi
+        else
+          # 发送无重要内容通知
+          curl -s -X POST "http://localhost:3001/api/notifications/send" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"message\": \"📊 今日新闻爬取完成\\n\\n未发现重要市场信号，市场表现平稳。\",
+              \"channels\": [\"$NOTIFY_CHANNELS\"],
+              \"priority\": \"low\"
+            }"
+        fi
+
+    - name: 测试通知渠道连通性
+      run: |
+        cd backend
+        # 测试所有通知渠道
+        curl -s -X GET "http://localhost:3001/api/notifications/test-connectivity" \
+          -H "Content-Type: application/json"
+
+    - name: 生成执行报告
+      if: always()
+      run: |
+        echo "=== 股票新闻分析执行报告 ==="
+        echo "执行时间: $(date)"
+        echo "触发方式: ${{ github.event_name }}"
+        echo "新闻源: ${{ github.event.inputs.sources || '默认源' }}"
+        echo "通知渠道: ${{ github.event.inputs.notify_channels || 'all' }}"
+        echo ""
+        echo "爬取结果:"
+        echo '${{ env.CRAWL_RESULT }}' | jq '.'
+        echo ""
+        echo "分析结果:"
+        echo '${{ env.ANALYSIS_RESULT }}' | jq '.'
+
+    - name: 清理资源
+      if: always()
+      run: |
+        pkill -f "node server.js" || true
+
+  deploy-frontend:
+    needs: crawl-and-analyze
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+
+    - name: 部署到GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./frontend/dist
+        keep_files: true
