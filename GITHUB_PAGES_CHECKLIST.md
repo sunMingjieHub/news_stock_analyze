@@ -1,86 +1,97 @@
 # GitHub Pages 部署检查清单
 
-## ✅ 已完成配置
+## ✅ 已完成的项目
 
-### 1. GitHub Actions工作流
+### 1. GitHub Actions 工作流配置
 - [x] 创建了 `.github/workflows/deploy-to-gh-pages.yml`
 - [x] 配置了自动触发（push到main分支）
-- [x] 设置了正确的权限和并发控制
-- [x] 包含构建和部署两个阶段
+- [x] 配置了手动触发（workflow_dispatch）
+- [x] 设置了正确的权限（pages: write, id-token: write）
+- [x] **修复了缓存配置**：使用package.json而非package-lock.json
 
-### 2. 环境配置
-- [x] 创建了 `frontend/.env.production`
-- [x] 配置了生产环境API地址
-- [x] 修改了 `vite.config.js` 支持环境变量
+### 2. 前端环境配置
+- [x] 创建了 `frontend/.env.production` 环境文件
+- [x] 配置了生产环境API地址变量
+- [x] 更新了 `frontend/vite.config.js` 支持环境变量
 
-### 3. 项目配置
-- [x] `package.json` 包含构建脚本
-- [x] `vite.config.js` 已配置base路径 `/stock/`
-- [x] 所有依赖项已正确配置
+### 3. 部署文档
+- [x] 创建了详细的部署指南 `GITHUB_PAGES_DEPLOYMENT.md`
+- [x] 包含了故障排除和验证步骤
 
-## 🔄 需要手动执行的步骤
+## 🔧 部署前检查
 
-### 1. GitHub仓库设置
-- [ ] 在GitHub仓库中启用GitHub Pages
-- [ ] 设置Source为GitHub Actions
-- [ ] 配置Workflow权限为Read and write
+### GitHub 仓库设置
+- [ ] 进入仓库 Settings → Pages
+- [ ] Source 选择 "GitHub Actions"
+- [ ] 保存设置
 
-### 2. 代码推送
-- [ ] 将当前代码推送到GitHub仓库的main分支
-- [ ] 监控GitHub Actions运行状态
+### 环境变量配置
+- [ ] 在仓库 Settings → Secrets and variables → Actions
+- [ ] 添加环境变量：`VITE_API_BASE_URL`
+- [ ] 值为您的Vercel后端地址
 
-### 3. 验证部署
-- [ ] 访问 `https://[username].github.io/stock/`
-- [ ] 测试前端功能是否正常
-- [ ] 验证后端API连接
+### 代码验证
+- [ ] 确认 `frontend/package.json` 存在
+- [ ] 确认构建脚本配置正确
+- [ ] 测试本地构建：`cd frontend && npm run build`
 
-## 📋 部署流程
+## 🚀 部署流程
 
-### 第一步：GitHub仓库设置
-1. 进入仓库Settings → Pages
-2. Source选择GitHub Actions
-3. 保存设置
+### 自动部署
+1. [ ] 推送代码到 main 分支
+2. [ ] 监控 GitHub Actions 执行状态
+3. [ ] 验证部署成功
 
-### 第二步：推送代码
-```bash
-git add .
-git commit -m "准备GitHub Pages部署"
-git push origin main
-```
+### 手动部署（可选）
+1. [ ] 进入 Actions 页面
+2. [ ] 选择 "Deploy to GitHub Pages" 工作流
+3. [ ] 点击 "Run workflow"
 
-### 第三步：监控部署
-1. 进入Actions选项卡
-2. 查看"Deploy to GitHub Pages"工作流
-3. 等待部署完成（绿色对勾）
+## 🐛 故障排除指南
 
-### 第四步：验证访问
-访问：`https://[您的GitHub用户名].github.io/stock/`
+### 缓存错误（已修复）
+**症状**：GitHub Actions 报错 "Some specified paths were not resolved, unable to cache dependencies."
 
-## 🔧 技术细节
+**原因**：frontend目录下没有package-lock.json文件
 
-### 后端服务地址
-- 生产环境：`https://stock-analysis-system-f478i1336-smjs-projects-bfe2d356.vercel.app/api`
-- 已配置在环境变量中
+**解决方案**：
+- ✅ 已修复：缓存依赖路径改为 `frontend/package.json`
+- ✅ 已修复：安装命令改为 `npm install`
 
-### 构建配置
-- Node.js版本：18
-- 构建命令：`npm run build`
-- 输出目录：`frontend/dist`
+### 构建失败
+- 检查Node.js版本兼容性
+- 确认依赖版本正确
+- 查看构建日志错误信息
 
-### 部署配置
-- Base路径：`/stock/`
-- 使用GitHub Pages Actions部署
-- 自动触发，无需手动干预
+### API连接问题
+- 确认VITE_API_BASE_URL环境变量正确
+- 验证Vercel后端服务状态
 
-## 🐛 故障排除
+### 页面空白
+- 检查dist目录生成
+- 验证静态资源路径
 
-如果部署失败，请检查：
-1. GitHub Actions日志中的错误信息
-2. 确保所有文件已正确提交
-3. 验证环境变量配置
-4. 检查后端服务状态
+## 📋 部署后验证清单
 
-## 📞 支持信息
+### 功能测试
+- [ ] 访问GitHub Pages URL
+- [ ] 测试前端页面加载
+- [ ] 验证API连接正常
+- [ ] 测试所有核心功能
 
-- 详细部署指南：`GITHUB_PAGES_DEPLOYMENT.md`
-- 后端部署检查：`VERCEL_DEPLOYMENT_CHECK.md`
+### 性能检查
+- [ ] 页面加载速度
+- [ ] 资源加载正确
+- [ ] 响应式设计正常
+
+## 🔗 相关文件
+- 工作流配置：`.github/workflows/deploy-to-gh-pages.yml`
+- 环境配置：`frontend/.env.production`
+- Vite配置：`frontend/vite.config.js`
+- 部署指南：`GITHUB_PAGES_DEPLOYMENT.md`
+
+## 📞 技术支持
+如遇问题：
+1. 查看GitHub Actions详细日志
+2. 参考部署文档中的故障排除部分
+3. 检查环境变量配置
