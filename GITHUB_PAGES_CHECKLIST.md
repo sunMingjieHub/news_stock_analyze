@@ -19,6 +19,11 @@
 - [x] 确认没有 package-lock.json 文件不会影响部署
 - [x] 确认依赖安装步骤配置正确
 
+## 缓存配置检查
+- [x] **检查缓存配置冲突**：确认没有其他工作流文件中的缓存配置干扰前端部署
+- [x] **修复缓存路径错误**：移除news-crawler.yml中指向backend/package-lock.json的错误缓存配置
+- [x] **验证Python项目缓存**：确认backend是Python项目，不需要npm缓存配置
+
 ## 部署过程检查
 
 ### ✅ 代码推送

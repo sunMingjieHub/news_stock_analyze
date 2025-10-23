@@ -30,8 +30,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: backend/package-lock.json
 
     - name: 安装后端依赖
       run: |
@@ -118,7 +116,7 @@ jobs:
             curl -s -X POST "http://localhost:3001/api/notifications/send" \
               -H "Content-Type: application/json" \
               -d "{
-                \"message\": \"📊 今日市场情绪分析完成\\n\\n总体情绪: $(echo $MARKET_ANALYSIS | jq -r '.overallSentiment')\\n置信度: $(echo $MARKET_ANALYSIS | jq -r '.confidence * 100 | round')%\\n建议: $(echo $MARKET_ANALYSIS | jq -r '.recommendation')\",
+                \"message\": \"📊 今日市场情绪分析完成\\\\n\\\\n总体情绪: $(echo $MARKET_ANALYSIS | jq -r '.overallSentiment')\\\\n置信度: $(echo $MARKET_ANALYSIS | jq -r '.confidence * 100 | round')%\\\\n建议: $(echo $MARKET_ANALYSIS | jq -r '.recommendation')\",
                 \"channels\": [\"$NOTIFY_CHANNELS\"],
                 \"priority\": \"normal\"
               }"
@@ -128,7 +126,7 @@ jobs:
           curl -s -X POST "http://localhost:3001/api/notifications/send" \
             -H "Content-Type: application/json" \
             -d "{
-              \"message\": \"📊 今日新闻爬取完成\\n\\n未发现重要市场信号，市场表现平稳。\",
+              \"message\": \"📊 今日新闻爬取完成\\\\n\\\\n未发现重要市场信号，市场表现平稳。\",
               \"channels\": [\"$NOTIFY_CHANNELS\"],
               \"priority\": \"low\"
             }"
@@ -160,19 +158,3 @@ jobs:
       if: always()
       run: |
         pkill -f "node server.js" || true
-
-  deploy-frontend:
-    needs: crawl-and-analyze
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 检出代码
-      uses: actions/checkout@v4
-
-    - name: 部署到GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./frontend/dist
-        keep_files: true
