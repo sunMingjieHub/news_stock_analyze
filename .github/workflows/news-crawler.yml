@@ -26,28 +26,76 @@ jobs:
     - name: 检出代码
       uses: actions/checkout@v4
 
+    - name: 检查Vercel API配置
+      run: |
+        if [ -z "${{ secrets.VERCEL_API_URL }}" ]; then
+          echo "❌ 错误：VERCEL_API_URL secret未设置"
+          echo "请在GitHub仓库的Settings → Secrets and variables → Actions中添加VERCEL_API_URL"
+          echo "值应为你的Vercel部署地址，例如：https://your-app.vercel.app"
+          exit 1
+        else
+          echo "✅ Vercel API地址配置正确: ${{ secrets.VERCEL_API_URL }}"
+        fi
+
     - name: 执行新闻爬取（调用Vercel API）
       run: |
+        # 检查API地址是否有效
+        API_URL="${{ secrets.VERCEL_API_URL }}"
+        if [[ ! "$API_URL" =~ ^https?:// ]]; then
+          echo "❌ 错误：API地址格式不正确，应以http://或https://开头"
+          echo "当前值: $API_URL"
+          exit 1
+        fi
+        
+        echo "正在调用API: ${API_URL}/api/news/crawl"
+        
         # 直接调用Vercel部署的后端API进行新闻爬取
-        RESPONSE=$(curl -s -X POST "${{ secrets.VERCEL_API_URL }}/api/news/crawl" \
+        RESPONSE=$(curl -s -w "%{http_code}" -X POST "${API_URL}/api/news/crawl" \
           -H "Content-Type: application/json" \
           -d "{\"sources\": [${{ github.event.inputs.sources || '[\"新浪财经\",\"东方财富\",\"雪球\"]' }}]}")
         
-        echo "爬取结果: $RESPONSE"
-        echo "CRAWL_RESULT=$RESPONSE" >> $GITHUB_ENV
+        # 分离HTTP状态码和响应体
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+        
+        echo "HTTP状态码: $HTTP_CODE"
+        echo "响应内容: $RESPONSE_BODY"
+        
+        if [ "$HTTP_CODE" -ne 200 ]; then
+          echo "❌ API调用失败，状态码: $HTTP_CODE"
+          echo "请检查："
+          echo "1. Vercel应用是否正常部署"
+          echo "2. API地址是否正确"
+          echo "3. 后端服务是否正常运行"
+          exit 1
+        fi
+        
+        echo "CRAWL_RESULT=$RESPONSE_BODY" >> $GITHUB_ENV
 
     - name: 分析新闻内容（调用Vercel API）
       run: |
         # 解析爬取结果并调用Vercel API进行分析
+        API_URL="${{ secrets.VERCEL_API_URL }}"
         CRAWL_DATA=$(echo '${{ env.CRAWL_RESULT }}' | jq -r '.results[] | select(.success == true) | .items[] | {title: .title, url: .url, content: "待提取", sourceCredibility: .credibility}' | jq -s '.')
         
         if [ "$(echo $CRAWL_DATA | jq length)" -gt 0 ]; then
-          ANALYSIS_RESPONSE=$(curl -s -X POST "${{ secrets.VERCEL_API_URL }}/api/analysis/batch-analyze" \
+          echo "正在分析新闻内容..."
+          ANALYSIS_RESPONSE=$(curl -s -w "%{http_code}" -X POST "${API_URL}/api/analysis/batch-analyze" \
             -H "Content-Type: application/json" \
             -d "{\"articles\": $CRAWL_DATA}")
           
-          echo "分析结果: $ANALYSIS_RESPONSE"
-          echo "ANALYSIS_RESULT=$ANALYSIS_RESPONSE" >> $GITHUB_ENV
+          HTTP_CODE=$(echo "$ANALYSIS_RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$ANALYSIS_RESPONSE" | head -n -1)
+          
+          echo "分析API状态码: $HTTP_CODE"
+          echo "分析结果: $RESPONSE_BODY"
+          
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ 分析API调用失败"
+            exit 1
+          fi
+          
+          echo "ANALYSIS_RESULT=$RESPONSE_BODY" >> $GITHUB_ENV
         else
           echo "没有可分析的新闻内容"
           echo "ANALYSIS_RESULT={\"success\":false,\"message\":\"无新闻内容\"}" >> $GITHUB_ENV
@@ -55,6 +103,7 @@ jobs:
 
     - name: 发送通知（调用Vercel API）
       run: |
+        API_URL="${{ secrets.VERCEL_API_URL }}"
         NOTIFY_CHANNELS="${{ github.event.inputs.notify_channels || 'all' }}"
         
         # 根据分析结果决定是否发送通知
@@ -66,7 +115,8 @@ jobs:
           
           if [ "$(echo $IMPORTANT_ANALYSIS | jq -s length)" -gt 0 ]; then
             # 发送重要分析通知
-            curl -s -X POST "${{ secrets.VERCEL_API_URL }}/api/notifications/alert" \
+            echo "发送重要分析通知..."
+            curl -s -X POST "${API_URL}/api/notifications/alert" \
               -H "Content-Type: application/json" \
               -d "{
                 \"title\": \"重要市场分析报告\",
@@ -77,7 +127,8 @@ jobs:
           else
             # 发送常规分析总结
             MARKET_ANALYSIS=$(echo $ANALYSIS_DATA | jq -r '.marketAnalysis')
-            curl -s -X POST "${{ secrets.VERCEL_API_URL }}/api/notifications/send" \
+            echo "发送常规分析通知..."
+            curl -s -X POST "${API_URL}/api/notifications/send" \
               -H "Content-Type: application/json" \
               -d "{
                 \"message\": \"📊 今日市场情绪分析完成\\\\n\\\\n总体情绪: $(echo $MARKET_ANALYSIS | jq -r '.overallSentiment')\\\\n置信度: $(echo $MARKET_ANALYSIS | jq -r '.confidence * 100 | round')%\\\\n建议: $(echo $MARKET_ANALYSIS | jq -r '.recommendation')\",
@@ -87,7 +138,8 @@ jobs:
           fi
         else
           # 发送无重要内容通知
-          curl -s -X POST "${{ secrets.VERCEL_API_URL }}/api/notifications/send" \
+          echo "发送无重要内容通知..."
+          curl -s -X POST "${API_URL}/api/notifications/send" \
             -H "Content-Type: application/json" \
             -d "{
               \"message\": \"📊 今日新闻爬取完成\\\\n\\\\n未发现重要市场信号，市场表现平稳。\",
@@ -98,9 +150,20 @@ jobs:
 
     - name: 测试通知渠道连通性
       run: |
-        # 测试所有通知渠道
-        curl -s -X GET "${{ secrets.VERCEL_API_URL }}/api/notifications/test-connectivity" \
-          -H "Content-Type: application/json"
+        # 测试API连通性
+        API_URL="${{ secrets.VERCEL_API_URL }}"
+        echo "测试API连通性: ${API_URL}/health"
+        
+        HEALTH_RESPONSE=$(curl -s -w "%{http_code}" "${API_URL}/health")
+        HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
+        RESPONSE_BODY=$(echo "$HEALTH_RESPONSE" | head -n -1)
+        
+        if [ "$HTTP_CODE" -eq 200 ]; then
+          echo "✅ API服务正常"
+        else
+          echo "❌ API服务异常，状态码: $HTTP_CODE"
+          echo "响应: $RESPONSE_BODY"
+        fi
 
     - name: 生成执行报告
       if: always()
