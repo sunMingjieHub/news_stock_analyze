@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重定向中...</title>
+    <script>
+        // 获取当前路径，去掉仓库名称前缀
+        const path = window.location.pathname;
+        const repoName = '/news_stock_analyze';
+        
+        // 如果路径以仓库名称开头，去掉仓库名称部分
+        let targetPath = path;
+        if (path.startsWith(repoName)) {
+            targetPath = path.substring(repoName.length);
+        }
+        
+        // 重定向到index.html，保留查询参数和哈希
+        const search = window.location.search;
+        const hash = window.location.hash;
+        window.location.href = repoName + '/index.html' + search + hash;
+    </script>
+</head>
+<body>
+    <p>正在重定向...</p>
+</body>
+</html>

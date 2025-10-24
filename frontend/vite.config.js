@@ -31,8 +31,10 @@ export default defineConfig(({ mode }) => {
           drop_console: true,
           drop_debugger: true
         }
-      }
+      },
+      // 确保public目录下的文件被复制到dist目录
+      copyPublicDir: true
     },
-    base: process.env.NODE_ENV === 'production' ? '/stock/' : '/'
+    base: process.env.NODE_ENV === 'production' ? '/news_stock_analyze/' : '/'
   }
 })

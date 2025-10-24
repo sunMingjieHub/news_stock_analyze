@@ -1,5 +1,5 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu } from 'antd'
 import {
   DashboardOutlined,
@@ -16,6 +16,9 @@ import './App.css'
 const { Header, Sider, Content } = Layout
 
 function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
   const menuItems = [
     {
       key: '1',
@@ -45,17 +48,24 @@ function App() {
 
   const [collapsed, setCollapsed] = React.useState(false)
 
+  // 获取当前选中的菜单项
+  const getSelectedKey = () => {
+    const currentPath = location.pathname
+    const item = menuItems.find(item => item.path === currentPath)
+    return item ? [item.key] : ['1']
+  }
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
         <div style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.3)' }} />
         <Menu
           theme="dark"
-          defaultSelectedKeys={['1']}
+          selectedKeys={getSelectedKey()}
           mode="inline"
           items={menuItems.map(item => ({
             ...item,
-            onClick: () => window.location.href = item.path
+            onClick: () => navigate(item.path)
           }))}
         />
       </Sider>

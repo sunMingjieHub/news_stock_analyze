@@ -14,10 +14,13 @@ const theme = {
   },
 }
 
+// 根据环境设置basename
+const basename = process.env.NODE_ENV === 'production' ? '/news_stock_analyze' : '/'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ConfigProvider locale={zhCN} theme={theme}>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <App />
       </BrowserRouter>
     </ConfigProvider>
